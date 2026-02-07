@@ -2,8 +2,6 @@
 
 EventBus v2 is a full rewrite of the plugin architecture with strict layering, deterministic lifecycle, and explicit channel governance.
 
-This version intentionally removes the v1 API surface. No migration wrappers are provided.
-
 ## Compatibility
 
 - Unreal Engine: `>= 5.5` (validated target baseline: 5.5, expected to work on 5.6+)
@@ -22,7 +20,7 @@ This version intentionally removes the v1 API surface. No migration wrappers are
 9. Follow OOP best practices.
 10. Maintain compatibility with C++ `>= 20` and Unreal Engine `>= 5.5` (5.6/5.7+ included).
 11. Keep code clean, safe, and well structured.
-12. Avoid workarounds and legacy code paths.
+12. Avoid workarounds and non-canonical code paths.
 13. Apply DRY best practices and avoid unnecessary repetition.
 14. Avoid dead or unreachable code.
 
@@ -343,11 +341,9 @@ Recommended validation:
 4. Listener removal precision (instance + function).
 5. Reset/unregister teardown leaves no stale bindings.
 
-## Breaking Changes From v1
+## Runtime Notes
 
-- `FEventBusManager` removed.
-- Previous v1 headers and utility layer removed.
-- v2 API requires explicit channel registration.
+- API requires explicit channel registration.
 - Blueprint binding requires registry allowlist validation.
 
 ## Additional Docs

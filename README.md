@@ -27,7 +27,7 @@ The project includes:
 9. Follow OOP best practices.
 10. Maintain compatibility with C++ `>= 20` and Unreal Engine `>= 5.5` (5.6/5.7+ included).
 11. Keep code clean, safe, and well structured.
-12. Avoid workarounds and legacy code paths.
+12. Avoid workarounds and non-canonical code paths.
 13. Apply DRY best practices and avoid unnecessary repetition.
 14. Avoid dead or unreachable code.
 
@@ -46,7 +46,6 @@ UEEventBus/
 |  |- ToyStatsPublisherComponent.*
 |  `- ToyCppListenerActor.*
 `- docs/
-   |- EventBus_DeepReview_RemediationPlan.md
    |- EventBus_v2_Architecture.md
    `- EventBus_v2_API.md
 ```
@@ -201,7 +200,6 @@ Expected runtime behavior:
 
 ## Documentation Index
 
-- Project plan and replacement details: `docs/EventBus_DeepReview_RemediationPlan.md`
 - Architecture details: `docs/EventBus_v2_Architecture.md`
 - API reference and examples: `docs/EventBus_v2_API.md`
 - Plugin-specific detailed guide: `Plugins/EventBus/README.md`

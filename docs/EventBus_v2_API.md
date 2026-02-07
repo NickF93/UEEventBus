@@ -13,7 +13,7 @@
 9. Follow OOP best practices.
 10. Maintain compatibility with C++ `>= 20` and Unreal Engine `>= 5.5` (5.6/5.7+ included).
 11. Keep code clean, safe, and well structured.
-12. Avoid workaround and legacy code paths.
+12. Avoid workaround and non-canonical code paths.
 13. Apply DRY best practices and avoid unnecessary repetition.
 14. Avoid dead or unreachable code.
 
