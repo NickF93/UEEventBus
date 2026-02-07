@@ -30,6 +30,9 @@ namespace Nfrrlib::EventBus
 		template <typename T>
 		concept CMemberFunctionPointer = requires { typename TMemberFunctionPtrOuter_T<TNoCVRef<T>>; };
 
+		/**
+		 * @brief Performs compile-time listener object/function contract checks and returns reflective function name.
+		 */
 		template <typename TObject, typename TFunc>
 		FORCEINLINE FName ValidateListenerFunc(const FName FunctionName)
 		{
@@ -55,7 +58,7 @@ namespace Nfrrlib::EventBus
 	struct TEventListenerMethod final
 	{
 		/** @brief Raw member-function pointer used for compile-time class validation. */
-		TFunc FunctionPtr{};
+		NFL_EVENTBUS_MAYBE_UNUSED TFunc FunctionPtr{};
 		/** @brief Reflected function name used by runtime binding. */
 		FName FunctionName = NAME_None;
 	};

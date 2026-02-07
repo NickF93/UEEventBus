@@ -23,6 +23,9 @@ namespace Nfrrlib::EventBus::Private
 		return bOwnsPublisherDelegates == bInOwnsPublisherDelegates;
 	}
 
+	/**
+	 * @brief Returns channel ownership policy configured at registration time.
+	 */
 	bool FEventChannelState::OwnsPublisherDelegates() const
 	{
 		return bOwnsPublisherDelegates;
@@ -423,24 +426,11 @@ namespace Nfrrlib::EventBus::Private
 	void FEventChannelState::RemoveBinding(
 		UObject* PublisherObj,
 		const FMulticastDelegateProperty* DelegateProperty,
-		UObject* ListenerObj,
+		UObject* NFL_EVENTBUS_MAYBE_UNUSED ListenerObj,
 		const FScriptDelegate& Callback) const
 	{
 		if (!::IsValid(PublisherObj) || DelegateProperty == nullptr)
 		{
-			return;
-		}
-
-		if (bOwnsPublisherDelegates)
-		{
-			for (const TPair<FListenerKey, FListenerEntry>& Pair : Listeners)
-			{
-				const FListenerEntry& ListenerEntry = Pair.Value;
-				if (ListenerEntry.Listener.Get() == ListenerObj && ListenerEntry.Callback.IsBound())
-				{
-					DelegateProperty->RemoveDelegate(ListenerEntry.Callback, PublisherObj);
-				}
-			}
 			return;
 		}
 

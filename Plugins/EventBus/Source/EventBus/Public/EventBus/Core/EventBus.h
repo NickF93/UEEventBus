@@ -15,7 +15,7 @@ namespace Nfrrlib::EventBus::Private
 	/**
 	 * @brief Custom deleter used to keep channel state type private and forward-declared in public headers.
 	 */
-	struct FEventChannelStateDeleter final
+	struct FEventChannelStateDeleter
 	{
 		void operator()(FEventChannelState* ChannelState) const;
 	};

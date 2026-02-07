@@ -19,13 +19,13 @@ namespace
 			return nullptr;
 		}
 
-		UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
+		UWorld* const World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
 		if (!::IsValid(World))
 		{
 			return nullptr;
 		}
 
-		UGameInstance* GameInstance = World->GetGameInstance();
+		UGameInstance* const GameInstance = World->GetGameInstance();
 		if (!::IsValid(GameInstance))
 		{
 			return nullptr;
@@ -35,6 +35,9 @@ namespace
 	}
 }
 
+/**
+ * @brief Blueprint facade wrapper for channel registration.
+ */
 bool UEventBusBlueprintLibrary::RegisterChannel(
 	UObject* WorldContextObject,
 	const FGameplayTag ChannelTag,

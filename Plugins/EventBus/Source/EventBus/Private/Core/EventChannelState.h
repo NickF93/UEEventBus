@@ -46,8 +46,8 @@ namespace Nfrrlib::EventBus::Private
 		/**
 		 * @brief Removes callback binding from a publisher delegate.
 		 *
-		 * In owning mode the method removes all EventBus-managed callbacks for ListenerObj.
-		 * In non-owning mode it removes only the exact callback passed through Callback.
+		 * This helper always removes the exact callback binding represented by Callback.
+		 * Object-wide ownership semantics are handled by remove-path key selection logic.
 		 */
 		void RemoveBinding(
 			UObject* PublisherObj,

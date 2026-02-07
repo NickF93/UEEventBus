@@ -15,6 +15,7 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_ListenerFirst, "EventBus.Test.Li
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_RenameIdentity, "EventBus.Test.RenameIdentity");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_ThreadGuard, "EventBus.Test.ThreadGuard");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_DeadCleanup, "EventBus.Test.DeadCleanup");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_OwningMultiFunc, "EventBus.Test.OwningMultiFunc");
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEventBusCoreRegisterUnregisterTest,
@@ -199,6 +200,48 @@ bool FEventBusDeadListenerCleanupTest::RunTest(const FString& NFL_EVENTBUS_MAYBE
 	Listener->MarkAsGarbage();
 	TestTrue(TEXT("Re-adding publisher succeeds after listener garbage mark"), Bus.AddPublisher(TAG_EventBus_Test_DeadCleanup, Publisher, PublisherBinding));
 	TestFalse(TEXT("Stale listener callback is removed during cleanup"), Publisher->OnValueChanged.IsBound());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusOwningModeMultiFunctionBindingTest,
+	"EventBus.Core.OwningModeMultiFunctionBinding",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusOwningModeMultiFunctionBindingTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_OwningMultiFunc;
+	Registration.bOwnsPublisherDelegates = true;
+	TestTrue(TEXT("Register owning channel succeeds"), Bus.RegisterChannel(Registration));
+
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+	TestTrue(TEXT("AddPublisher succeeds"), Bus.AddPublisher(TAG_EventBus_Test_OwningMultiFunc, Publisher, PublisherBinding));
+
+	FListenerBinding ListenerBindingA;
+	ListenerBindingA.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue);
+	TestTrue(TEXT("Add first listener function succeeds"), Bus.AddListener(TAG_EventBus_Test_OwningMultiFunc, Listener, ListenerBindingA));
+
+	FListenerBinding ListenerBindingB;
+	ListenerBindingB.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValueAlt);
+	TestTrue(TEXT("Add second listener function succeeds"), Bus.AddListener(TAG_EventBus_Test_OwningMultiFunc, Listener, ListenerBindingB));
+
+	Publisher->EmitValue(5.0f);
+	TestEqual(TEXT("First function receives callback"), Listener->ValueCallCount, 1);
+	TestEqual(TEXT("Second function receives callback"), Listener->ValueAltCallCount, 1);
+
+	TestTrue(TEXT("Owning remove by object+function succeeds"), Bus.RemoveListener(TAG_EventBus_Test_OwningMultiFunc, Listener, ListenerBindingA));
+	Publisher->EmitValue(7.0f);
+	TestEqual(TEXT("All object callbacks removed in owning mode (first)"), Listener->ValueCallCount, 1);
+	TestEqual(TEXT("All object callbacks removed in owning mode (second)"), Listener->ValueAltCallCount, 1);
 
 	return true;
 }

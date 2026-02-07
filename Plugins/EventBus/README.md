@@ -352,6 +352,5 @@ Recommended validation:
 
 ## Additional Docs
 
-- `docs/EventBus_DeepReview_RemediationPlan.md`
 - `docs/EventBus_v2_Architecture.md`
 - `docs/EventBus_v2_API.md`
