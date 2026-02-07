@@ -1,0 +1,23 @@
+﻿{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "EventBus",
+	"Description": "Event Bus System",
+	"Category": "Other",
+	"CreatedBy": "Niccolò Ferrari",
+	"CreatedByURL": "https://github.com/NickF93",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "EventBus",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
