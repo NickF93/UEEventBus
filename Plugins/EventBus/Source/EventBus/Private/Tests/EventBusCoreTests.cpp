@@ -1,0 +1,206 @@
+#include "Misc/AutomationTest.h"
+
+#include "Async/Async.h"
+#include "NativeGameplayTags.h"
+
+#include "EventBus/Core/EventBusAttributes.h"
+#include "EventBus/Core/EventBus.h"
+#include "Tests/EventBusTestObjects.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_Core, "EventBus.Test.Core");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_SignatureKnown, "EventBus.Test.SignatureKnown");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_ListenerFirst, "EventBus.Test.ListenerFirst");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_RenameIdentity, "EventBus.Test.RenameIdentity");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_ThreadGuard, "EventBus.Test.ThreadGuard");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_DeadCleanup, "EventBus.Test.DeadCleanup");
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusCoreRegisterUnregisterTest,
+	"EventBus.Core.RegisterUnregisterAndConflict",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusCoreRegisterUnregisterTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_Core;
+	Registration.bOwnsPublisherDelegates = false;
+
+	TestTrue(TEXT("RegisterChannel succeeds"), Bus.RegisterChannel(Registration));
+	TestTrue(TEXT("Idempotent register with same ownership succeeds"), Bus.RegisterChannel(Registration));
+
+	FChannelRegistration ConflictRegistration;
+	ConflictRegistration.ChannelTag = TAG_EventBus_Test_Core;
+	ConflictRegistration.bOwnsPublisherDelegates = true;
+	TestFalse(TEXT("Conflicting ownership register fails"), Bus.RegisterChannel(ConflictRegistration));
+
+	TestTrue(TEXT("Channel is registered"), Bus.IsChannelRegistered(TAG_EventBus_Test_Core));
+	TestTrue(TEXT("UnregisterChannel succeeds"), Bus.UnregisterChannel(TAG_EventBus_Test_Core));
+	TestFalse(TEXT("Channel is no longer registered"), Bus.IsChannelRegistered(TAG_EventBus_Test_Core));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusSignatureMismatchKnownChannelTest,
+	"EventBus.Core.SignatureMismatchKnownChannel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusSignatureMismatchKnownChannelTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_SignatureKnown;
+	TestTrue(TEXT("Register channel succeeds"), Bus.RegisterChannel(Registration));
+
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+	TestTrue(TEXT("AddPublisher succeeds"), Bus.AddPublisher(TAG_EventBus_Test_SignatureKnown, Publisher, PublisherBinding));
+
+	FListenerBinding BadListenerBinding;
+	BadListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnNoArgs);
+	TestFalse(TEXT("Mismatched listener function fails"), Bus.AddListener(TAG_EventBus_Test_SignatureKnown, Listener, BadListenerBinding));
+
+	FListenerBinding GoodListenerBinding;
+	GoodListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue);
+	TestTrue(TEXT("Compatible listener function succeeds"), Bus.AddListener(TAG_EventBus_Test_SignatureKnown, Listener, GoodListenerBinding));
+
+	Publisher->EmitValue(1.0f);
+	TestEqual(TEXT("Compatible listener is invoked"), Listener->ValueCallCount, 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusListenerFirstMismatchPublisherFailTest,
+	"EventBus.Core.ListenerFirstMismatchPublisherFail",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusListenerFirstMismatchPublisherFailTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_ListenerFirst;
+	TestTrue(TEXT("Register channel succeeds"), Bus.RegisterChannel(Registration));
+
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FListenerBinding EarlyListenerBinding;
+	EarlyListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnNoArgs);
+	TestTrue(TEXT("Listener-first registration succeeds before signature is known"), Bus.AddListener(TAG_EventBus_Test_ListenerFirst, Listener, EarlyListenerBinding));
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+	TestFalse(TEXT("First publisher fails due incompatible existing listener"), Bus.AddPublisher(TAG_EventBus_Test_ListenerFirst, Publisher, PublisherBinding));
+
+	TestTrue(TEXT("Removing mismatched listener succeeds"), Bus.RemoveListener(TAG_EventBus_Test_ListenerFirst, Listener, EarlyListenerBinding));
+	TestTrue(TEXT("Publisher succeeds after mismatch listener is removed"), Bus.AddPublisher(TAG_EventBus_Test_ListenerFirst, Publisher, PublisherBinding));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusListenerIdentityRenameSafeTest,
+	"EventBus.Core.ListenerIdentityRenameSafe",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusListenerIdentityRenameSafeTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_RenameIdentity;
+	TestTrue(TEXT("Register channel succeeds"), Bus.RegisterChannel(Registration));
+
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+	TestTrue(TEXT("AddPublisher succeeds"), Bus.AddPublisher(TAG_EventBus_Test_RenameIdentity, Publisher, PublisherBinding));
+
+	FListenerBinding ListenerBinding;
+	ListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue);
+	TestTrue(TEXT("AddListener succeeds"), Bus.AddListener(TAG_EventBus_Test_RenameIdentity, Listener, ListenerBinding));
+
+	Publisher->EmitValue(1.0f);
+	TestEqual(TEXT("Listener invoked before rename"), Listener->ValueCallCount, 1);
+
+	Listener->Rename(TEXT("RenamedEventBusListener"));
+	TestTrue(TEXT("RemoveListener succeeds after listener rename"), Bus.RemoveListener(TAG_EventBus_Test_RenameIdentity, Listener, ListenerBinding));
+
+	Publisher->EmitValue(1.0f);
+	TestEqual(TEXT("Listener is no longer invoked after remove"), Listener->ValueCallCount, 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusThreadGuardIsChannelRegisteredTest,
+	"EventBus.Core.ThreadGuardIsChannelRegistered",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusThreadGuardIsChannelRegisteredTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_ThreadGuard;
+	TestTrue(TEXT("Register channel succeeds"), Bus.RegisterChannel(Registration));
+
+	const bool bOffThreadResult = Async(EAsyncExecution::ThreadPool, [&Bus]()
+	{
+		return Bus.IsChannelRegistered(TAG_EventBus_Test_ThreadGuard);
+	}).Get();
+
+	TestFalse(TEXT("IsChannelRegistered returns false off-thread"), bOffThreadResult);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusDeadListenerCleanupTest,
+	"EventBus.Core.DeadListenerCleanup",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusDeadListenerCleanupTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_DeadCleanup;
+	TestTrue(TEXT("Register channel succeeds"), Bus.RegisterChannel(Registration));
+
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+	TestTrue(TEXT("AddPublisher succeeds"), Bus.AddPublisher(TAG_EventBus_Test_DeadCleanup, Publisher, PublisherBinding));
+
+	FListenerBinding ListenerBinding;
+	ListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue);
+	TestTrue(TEXT("AddListener succeeds"), Bus.AddListener(TAG_EventBus_Test_DeadCleanup, Listener, ListenerBinding));
+	TestTrue(TEXT("Delegate is bound after listener add"), Publisher->OnValueChanged.IsBound());
+
+	Listener->MarkAsGarbage();
+	TestTrue(TEXT("Re-adding publisher succeeds after listener garbage mark"), Bus.AddPublisher(TAG_EventBus_Test_DeadCleanup, Publisher, PublisherBinding));
+	TestFalse(TEXT("Stale listener callback is removed during cleanup"), Publisher->OnValueChanged.IsBound());
+
+	return true;
+}
+
+#endif // WITH_DEV_AUTOMATION_TESTS
