@@ -63,3 +63,19 @@ public:
 	UFUNCTION()
 	void OnNoArgs();
 };
+
+/**
+ * @brief Derived listener used to validate class-local behavior in runtime history queries.
+ */
+UCLASS()
+class EVENTBUS_API UEventBusTestDerivedListenerObject : public UEventBusTestListenerObject
+{
+	GENERATED_BODY()
+
+public:
+	int32 DerivedValueCallCount = 0;
+
+	/** @brief Callback declared only on derived listener class. */
+	UFUNCTION()
+	void OnDerivedValue(float InValue);
+};

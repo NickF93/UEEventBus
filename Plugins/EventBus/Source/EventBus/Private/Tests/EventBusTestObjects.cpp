@@ -48,3 +48,11 @@ void UEventBusTestListenerObject::OnPair(
 void UEventBusTestListenerObject::OnNoArgs()
 {
 }
+
+/**
+ * @brief Increments derived callback counter.
+ */
+void UEventBusTestDerivedListenerObject::OnDerivedValue(const float NFL_EVENTBUS_MAYBE_UNUSED InValue)
+{
+	++DerivedValueCallCount;
+}

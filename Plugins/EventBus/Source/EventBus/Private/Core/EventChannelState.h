@@ -44,6 +44,11 @@ namespace Nfrrlib::EventBus::Private
 		void RefreshChannelSignature();
 
 		/**
+		 * @brief Returns true when listener entry should be treated as stale for cleanup.
+		 */
+		NFL_EVENTBUS_NODISCARD bool IsListenerEntryStale(const FListenerEntry& ListenerEntry) const;
+
+		/**
 		 * @brief Removes callback binding from a publisher delegate.
 		 *
 		 * This helper always removes the exact callback binding represented by Callback.
@@ -52,7 +57,6 @@ namespace Nfrrlib::EventBus::Private
 		void RemoveBinding(
 			UObject* PublisherObj,
 			const FMulticastDelegateProperty* DelegateProperty,
-			UObject* ListenerObj,
 			const FScriptDelegate& Callback) const;
 
 		/** @brief Binds a listener callback to a publisher delegate with duplicate-safe behavior. */

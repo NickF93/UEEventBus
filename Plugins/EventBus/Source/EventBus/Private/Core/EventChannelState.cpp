@@ -92,7 +92,7 @@ namespace Nfrrlib::EventBus::Private
 		for (const TPair<FListenerKey, FListenerEntry>& Pair : Listeners)
 		{
 			const FListenerEntry& ListenerEntry = Pair.Value;
-			if (!::IsValid(ListenerEntry.Listener.Get()) || ListenerEntry.ListenerFunction == nullptr)
+			if (IsListenerEntryStale(ListenerEntry) || ListenerEntry.ListenerFunction == nullptr)
 			{
 				continue;
 			}
@@ -359,24 +359,48 @@ namespace Nfrrlib::EventBus::Private
 	{
 		for (auto It = Listeners.CreateIterator(); It; ++It)
 		{
-			if (!::IsValid(It.Value().Listener.Get()))
+			if (IsListenerEntryStale(It.Value()))
 			{
 				const FScriptDelegate StaleCallback = It.Value().Callback;
-				if (StaleCallback.IsBound())
+				UObject* const ListenerEvenIfUnreachable = It.Value().Listener.GetEvenIfUnreachable();
+				const FName StaleFunctionName = It.Value().FunctionName;
+				for (FPublisherEntry& PublisherEntry : Publishers)
 				{
-					for (FPublisherEntry& PublisherEntry : Publishers)
+					UObject* const PublisherObj = PublisherEntry.Publisher.Get();
+					if (!::IsValid(PublisherObj) || PublisherEntry.DelegateProperty == nullptr)
 					{
-						UObject* PublisherObj = PublisherEntry.Publisher.Get();
-						if (::IsValid(PublisherObj) && PublisherEntry.DelegateProperty != nullptr)
+						continue;
+					}
+
+					RemoveBinding(PublisherObj, PublisherEntry.DelegateProperty, StaleCallback);
+
+					const void* const PropertyValue =
+						PublisherEntry.DelegateProperty->ContainerPtrToValuePtr<void>(PublisherObj);
+					if (const FMulticastScriptDelegate* const MulticastDelegate =
+						PublisherEntry.DelegateProperty->GetMulticastDelegate(PropertyValue))
+					{
+						FMulticastScriptDelegate* const MutableDelegate = const_cast<FMulticastScriptDelegate*>(MulticastDelegate);
+						if (ListenerEvenIfUnreachable != nullptr && !StaleFunctionName.IsNone())
 						{
-							PublisherEntry.DelegateProperty->RemoveDelegate(StaleCallback, PublisherObj);
+							MutableDelegate->Remove(ListenerEvenIfUnreachable, StaleFunctionName);
 						}
+
+						MutableDelegate->RemoveAll(nullptr);
 					}
 				}
 
 				It.RemoveCurrent();
 			}
 		}
+	}
+
+	/**
+	 * @brief Returns true when listener object can no longer be considered a valid runtime bind target.
+	 */
+	bool FEventChannelState::IsListenerEntryStale(const FListenerEntry& ListenerEntry) const
+	{
+		return ListenerEntry.Listener.IsStale(/*bIncludingIfPendingKill=*/true, /*bThreadsafeTest=*/false) ||
+			!::IsValid(ListenerEntry.Listener.Get());
 	}
 
 	/**
@@ -421,12 +445,11 @@ namespace Nfrrlib::EventBus::Private
 	}
 
 	/**
-	 * @brief Removes callback bindings from one publisher according to channel ownership policy.
+	 * @brief Removes one exact callback binding from one publisher delegate and compacts stale entries.
 	 */
 	void FEventChannelState::RemoveBinding(
 		UObject* PublisherObj,
 		const FMulticastDelegateProperty* DelegateProperty,
-		UObject* NFL_EVENTBUS_MAYBE_UNUSED ListenerObj,
 		const FScriptDelegate& Callback) const
 	{
 		if (!::IsValid(PublisherObj) || DelegateProperty == nullptr)
@@ -434,9 +457,15 @@ namespace Nfrrlib::EventBus::Private
 			return;
 		}
 
-		if (Callback.IsBound())
+		// Always execute removal to force delegate compaction of stale compactable entries.
+		DelegateProperty->RemoveDelegate(Callback, PublisherObj);
+
+		// RemoveDelegate does not guarantee stale unreachable callbacks are gone in all lifecycle phases.
+		// Explicitly compact compactable entries on this publisher delegate.
+		const void* const PropertyValue = DelegateProperty->ContainerPtrToValuePtr<void>(PublisherObj);
+		if (const FMulticastScriptDelegate* const MulticastDelegate = DelegateProperty->GetMulticastDelegate(PropertyValue))
 		{
-			DelegateProperty->RemoveDelegate(Callback, PublisherObj);
+			const_cast<FMulticastScriptDelegate*>(MulticastDelegate)->RemoveAll(nullptr);
 		}
 	}
 
@@ -447,12 +476,12 @@ namespace Nfrrlib::EventBus::Private
 	{
 		UObject* PublisherObj = PublisherEntry.Publisher.Get();
 		UObject* ListenerObj = ListenerEntry.Listener.Get();
-		if (!::IsValid(PublisherObj) || !::IsValid(ListenerObj) || PublisherEntry.DelegateProperty == nullptr)
+		if (!::IsValid(PublisherObj) || !::IsValid(ListenerObj) || PublisherEntry.DelegateProperty == nullptr || IsListenerEntryStale(ListenerEntry))
 		{
 			return;
 		}
 
-		RemoveBinding(PublisherObj, PublisherEntry.DelegateProperty, ListenerObj, ListenerEntry.Callback);
+		RemoveBinding(PublisherObj, PublisherEntry.DelegateProperty, ListenerEntry.Callback);
 		PublisherEntry.DelegateProperty->AddDelegate(ListenerEntry.Callback, PublisherObj);
 	}
 
@@ -462,13 +491,12 @@ namespace Nfrrlib::EventBus::Private
 	void FEventChannelState::UnbindListenerFromPublisher(const FListenerEntry& ListenerEntry, FPublisherEntry& PublisherEntry) const
 	{
 		UObject* PublisherObj = PublisherEntry.Publisher.Get();
-		UObject* ListenerObj = ListenerEntry.Listener.Get();
-		if (!::IsValid(PublisherObj) || !::IsValid(ListenerObj) || PublisherEntry.DelegateProperty == nullptr)
+		if (!::IsValid(PublisherObj) || PublisherEntry.DelegateProperty == nullptr)
 		{
 			return;
 		}
 
-		RemoveBinding(PublisherObj, PublisherEntry.DelegateProperty, ListenerObj, ListenerEntry.Callback);
+		RemoveBinding(PublisherObj, PublisherEntry.DelegateProperty, ListenerEntry.Callback);
 	}
 
 	/**

@@ -41,6 +41,21 @@ bool FEventBusBlueprintRegistryValidationTest::RunTest(const FString& NFL_EVENTB
 		UEventBusTestListenerObject::StaticClass());
 	TestEqual(TEXT("Unknown channel has no recorded functions"), UnknownChannelFunctions.Num(), 0);
 
+	Registry->RecordListenerBinding(
+		TAG_EventBus_Test_BP,
+		UEventBusTestDerivedListenerObject::StaticClass(),
+		GET_FUNCTION_NAME_CHECKED(UEventBusTestDerivedListenerObject, OnDerivedValue));
+
+	const TArray<FName> BaseClassKnownFunctions = Registry->GetKnownListenerFunctions(
+		TAG_EventBus_Test_BP,
+		UEventBusTestListenerObject::StaticClass());
+	TestFalse(TEXT("Base class query does not include derived-only function"), BaseClassKnownFunctions.Contains(GET_FUNCTION_NAME_CHECKED(UEventBusTestDerivedListenerObject, OnDerivedValue)));
+
+	const TArray<FName> DerivedClassKnownFunctions = Registry->GetKnownListenerFunctions(
+		TAG_EventBus_Test_BP,
+		UEventBusTestDerivedListenerObject::StaticClass());
+	TestTrue(TEXT("Derived class query includes derived-only function"), DerivedClassKnownFunctions.Contains(GET_FUNCTION_NAME_CHECKED(UEventBusTestDerivedListenerObject, OnDerivedValue)));
+
 	return true;
 }
 
