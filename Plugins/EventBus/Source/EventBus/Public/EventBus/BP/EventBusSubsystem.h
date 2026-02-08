@@ -19,6 +19,8 @@ class EVENTBUS_API UEventBusSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	/** @brief Emits subsystem startup diagnostics for runtime tracing. */
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	/** @brief Ensures EventBus runtime teardown happens during subsystem shutdown. */
 	virtual void Deinitialize() override;
 
