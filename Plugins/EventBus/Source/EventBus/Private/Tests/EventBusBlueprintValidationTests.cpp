@@ -9,10 +9,11 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_BP, "EventBus.Test.BP");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_BP_Unknown, "EventBus.Test.BP.Unknown");
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEventBusBlueprintRegistryValidationTest,
-	"EventBus.Blueprint.RegistryValidation",
+	"EventBus.Blueprint.RegistryHistory",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FEventBusBlueprintRegistryValidationTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
@@ -20,47 +21,25 @@ bool FEventBusBlueprintRegistryValidationTest::RunTest(const FString& NFL_EVENTB
 	UEventBusRegistryAsset* Registry = NewObject<UEventBusRegistryAsset>();
 	TestNotNull(TEXT("Registry asset created"), Registry);
 
-	FEventBusPublisherRule PublisherRule;
-	PublisherRule.ChannelTag = TAG_EventBus_Test_BP;
-	PublisherRule.PublisherClass = UEventBusTestPublisherObject::StaticClass();
-	PublisherRule.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
-	Registry->PublisherRules.Add(PublisherRule);
-
-	FEventBusListenerRule ListenerRule;
-	ListenerRule.ChannelTag = TAG_EventBus_Test_BP;
-	ListenerRule.ListenerClass = UEventBusTestListenerObject::StaticClass();
-	ListenerRule.AllowedFunctions.Add(GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue));
-	Registry->ListenerRules.Add(ListenerRule);
-
-	const bool bPublisherAllowed = Registry->IsPublisherAllowed(
+	Registry->RecordPublisherBinding(
 		TAG_EventBus_Test_BP,
 		UEventBusTestPublisherObject::StaticClass(),
 		GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged));
-	TestTrue(TEXT("Publisher allowlist positive case succeeds"), bPublisherAllowed);
-
-	const bool bWrongPublisherPropertyDenied = Registry->IsPublisherAllowed(
-		TAG_EventBus_Test_BP,
-		UEventBusTestPublisherObject::StaticClass(),
-		GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnPairChanged));
-	TestFalse(TEXT("Publisher wrong property is denied"), bWrongPublisherPropertyDenied);
-
-	const bool bListenerAllowed = Registry->IsListenerAllowed(
+	Registry->RecordListenerBinding(
 		TAG_EventBus_Test_BP,
 		UEventBusTestListenerObject::StaticClass(),
 		GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue));
-	TestTrue(TEXT("Listener allowlist positive case succeeds"), bListenerAllowed);
 
-	const bool bWrongListenerFunctionDenied = Registry->IsListenerAllowed(
-		TAG_EventBus_Test_BP,
-		UEventBusTestListenerObject::StaticClass(),
-		GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnNoArgs));
-	TestFalse(TEXT("Listener wrong function is denied"), bWrongListenerFunctionDenied);
-
-	const TArray<FName> AllowedFunctions = Registry->GetAllowedListenerFunctions(
+	const TArray<FName> KnownFunctions = Registry->GetKnownListenerFunctions(
 		TAG_EventBus_Test_BP,
 		UEventBusTestListenerObject::StaticClass());
-	TestEqual(TEXT("One allowlisted listener function is returned"), AllowedFunctions.Num(), 1);
-	TestTrue(TEXT("Allowlisted function exists in returned list"), AllowedFunctions.Contains(GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue)));
+	TestEqual(TEXT("One recorded listener function is returned"), KnownFunctions.Num(), 1);
+	TestTrue(TEXT("Recorded function exists in returned list"), KnownFunctions.Contains(GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue)));
+
+	const TArray<FName> UnknownChannelFunctions = Registry->GetKnownListenerFunctions(
+		TAG_EventBus_Test_BP_Unknown,
+		UEventBusTestListenerObject::StaticClass());
+	TestEqual(TEXT("Unknown channel has no recorded functions"), UnknownChannelFunctions.Num(), 0);
 
 	return true;
 }

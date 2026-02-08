@@ -1,4 +1,4 @@
-# EventBus v2 Architecture
+﻿# EventBus v2 Architecture
 
 ## Mandatory Constraints (1-14)
 
@@ -20,55 +20,54 @@
 ## Layers
 
 1. Core (`EventBus/Core/*`): runtime orchestration and channel state.
-2. Typed (`EventBus/Typed/*`): compile-time channel utilities for C++.
-3. BP (`EventBus/BP/*`): subsystem and blueprint function facade.
-4. Registry (`UEventBusRegistryAsset`): allowlist governance for BP operations.
+2. Typed (`EventBus/Typed/*`): compile-time channel wrappers for native C++.
+3. Blueprint (`EventBus/BP/*`): subsystem + function library.
+4. Editor (`EventBusEditor/*`): filtered K2 nodes and pin factories.
 
 ## Dependency DAG
 
 - Core -> none
 - Typed -> Core
-- BP -> Core + Registry
-- Registry -> Core types only
+- Blueprint -> Core
+- Editor -> Blueprint (+ Unreal editor modules)
 
 No reverse dependencies are allowed.
 
 ## Runtime Flow
 
-1. Register channel with ownership policy.
-2. Add publisher (channel + object + delegate property).
-3. Add listener (channel + object + function name).
-4. Publisher broadcasts delegate.
-5. Remove listener/publisher as needed.
-6. Reset or unregister channel performs full unbind and cleanup.
+1. Register one channel with ownership policy.
+2. Add one or more publishers on that channel.
+3. Add one or more listeners on that channel.
+4. Dispatch via publisher delegate.
+5. Remove listener/publisher entries.
+6. Unregister channel or reset subsystem.
 
 ## Channel Signature Model
 
-1. First valid publisher delegate bound on a channel establishes the channel signature.
-2. Additional publishers on the same channel must be signature-compatible.
-3. New listeners must be signature-compatible with established channel signature.
-4. Listener-first registration is allowed; compatibility is enforced when first publisher is added.
+1. First successful publisher bind defines channel signature.
+2. Additional publishers/listeners on that channel must be compatible.
+3. Listener-first registration is allowed; first publisher enforces compatibility.
 
 ## Listener Identity Model
 
 1. Listener identity key is `FObjectKey + FName`.
-2. Identity is stable across object rename operations.
-3. Remove operations use this key in non-owning mode.
-4. Owning mode removal still supports object-wide callback cleanup semantics.
+2. Remove operations target this key in non-owning mode.
+3. Owning mode can perform object-wide EventBus callback cleanup.
 
-## Blueprint Registry Model
+## Runtime History Model
 
-1. Publisher and listener class allowlists are defined with `TSubclassOf<UObject>`.
-2. Rules are deterministic at runtime (no lazy-load soft class ambiguity).
-3. Validation is mandatory for Blueprint add/remove bind entry points.
+1. Subsystem creates an internal transient runtime history object at initialize.
+2. Successful BP binds are recorded as channel/class/member tuples.
+3. `GetKnownListenerFunctions` reads this dynamic history.
+4. No manual rule asset setup is required.
 
 ## Ownership Policy
 
 - `bOwnsPublisherDelegates = true`
-  - removal uses object-wide EventBus-managed callback cleanup.
+  - object-wide EventBus-managed callback cleanup.
 - `bOwnsPublisherDelegates = false`
-  - removal uses targeted callback cleanup.
+  - exact callback cleanup only.
 
 ## Threading
 
-All API calls are game-thread only.
+All runtime API calls are game-thread only.

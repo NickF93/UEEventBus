@@ -57,6 +57,177 @@ namespace
 
 		return Subsystem;
 	}
+
+	/**
+	 * @brief Records one publisher binding in runtime history registry if available.
+	 */
+	FORCEINLINE void RecordPublisherHistory(
+		UEventBusSubsystem* Subsystem,
+		const FGameplayTag& ChannelTag,
+		UObject* PublisherObj,
+		const FName DelegatePropertyName)
+	{
+		if (!::IsValid(Subsystem) || !::IsValid(PublisherObj))
+		{
+			return;
+		}
+
+		UEventBusRegistryAsset* Registry = const_cast<UEventBusRegistryAsset*>(Subsystem->GetRuntimeRegistry());
+		if (::IsValid(Registry))
+		{
+			Registry->RecordPublisherBinding(ChannelTag, PublisherObj->GetClass(), DelegatePropertyName);
+		}
+	}
+
+	/**
+	 * @brief Records one listener binding in runtime history registry if available.
+	 */
+	FORCEINLINE void RecordListenerHistory(
+		UEventBusSubsystem* Subsystem,
+		const FGameplayTag& ChannelTag,
+		UObject* ListenerObj,
+		const FName FunctionName)
+	{
+		if (!::IsValid(Subsystem) || !::IsValid(ListenerObj))
+		{
+			return;
+		}
+
+		UEventBusRegistryAsset* Registry = const_cast<UEventBusRegistryAsset*>(Subsystem->GetRuntimeRegistry());
+		if (::IsValid(Registry))
+		{
+			Registry->RecordListenerBinding(ChannelTag, ListenerObj->GetClass(), FunctionName);
+		}
+	}
+
+	/**
+	 * @brief Validates channel and object inputs shared by BP binding entry points.
+	 */
+	FORCEINLINE bool ValidateBindingInputs(
+		const TCHAR* ApiName,
+		const TCHAR* ObjectLabel,
+		const FGameplayTag& ChannelTag,
+		UObject* BoundObject)
+	{
+		if (!ChannelTag.IsValid())
+		{
+			UE_LOG(LogNFLEventBus, Warning,
+				TEXT("BP %s denied: ChannelTag is invalid."),
+				ApiName);
+			return false;
+		}
+
+		if (!::IsValid(BoundObject))
+		{
+			UE_LOG(LogNFLEventBus, Warning,
+				TEXT("BP %s denied: %s is invalid."),
+				ApiName,
+				ObjectLabel);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * @brief Shared implementation for publisher-add APIs to keep behavior and logging aligned.
+	 */
+	FORCEINLINE bool AddPublisherInternal(
+		UObject* WorldContextObject,
+		const FGameplayTag& ChannelTag,
+		UObject* PublisherObj,
+		const FName DelegatePropertyName,
+		const TCHAR* ApiName)
+	{
+		UE_LOG(LogNFLEventBus, Log,
+			TEXT("BP %s request. Channel=%s Publisher=%s Delegate=%s"),
+			ApiName,
+			*ChannelTag.ToString(),
+			*GetNameSafe(PublisherObj),
+			*DelegatePropertyName.ToString());
+
+		UEventBusSubsystem* const Subsystem = ResolveEventBusSubsystem(WorldContextObject);
+		if (!::IsValid(Subsystem))
+		{
+			UE_LOG(LogNFLEventBus, Warning,
+				TEXT("BP %s denied: subsystem resolution failed."),
+				ApiName);
+			return false;
+		}
+
+		if (!ValidateBindingInputs(ApiName, TEXT("PublisherObj"), ChannelTag, PublisherObj))
+		{
+			return false;
+		}
+
+		Nfrrlib::EventBus::FPublisherBinding Binding;
+		Binding.DelegatePropertyName = DelegatePropertyName;
+
+		const bool bResult = Subsystem->GetEventBus().AddPublisher(ChannelTag, PublisherObj, Binding);
+		if (bResult)
+		{
+			RecordPublisherHistory(Subsystem, ChannelTag, PublisherObj, DelegatePropertyName);
+		}
+
+		UE_LOG(LogNFLEventBus, Log,
+			TEXT("BP %s result. Channel=%s Publisher=%s Delegate=%s Success=%s"),
+			ApiName,
+			*ChannelTag.ToString(),
+			*GetNameSafe(PublisherObj),
+			*DelegatePropertyName.ToString(),
+			bResult ? TEXT("true") : TEXT("false"));
+		return bResult;
+	}
+
+	/**
+	 * @brief Shared implementation for listener-add APIs to keep behavior and logging aligned.
+	 */
+	FORCEINLINE bool AddListenerInternal(
+		UObject* WorldContextObject,
+		const FGameplayTag& ChannelTag,
+		UObject* ListenerObj,
+		const FName FunctionName,
+		const TCHAR* ApiName)
+	{
+		UE_LOG(LogNFLEventBus, Log,
+			TEXT("BP %s request. Channel=%s Listener=%s Function=%s"),
+			ApiName,
+			*ChannelTag.ToString(),
+			*GetNameSafe(ListenerObj),
+			*FunctionName.ToString());
+
+		UEventBusSubsystem* const Subsystem = ResolveEventBusSubsystem(WorldContextObject);
+		if (!::IsValid(Subsystem))
+		{
+			UE_LOG(LogNFLEventBus, Warning,
+				TEXT("BP %s denied: subsystem resolution failed."),
+				ApiName);
+			return false;
+		}
+
+		if (!ValidateBindingInputs(ApiName, TEXT("ListenerObj"), ChannelTag, ListenerObj))
+		{
+			return false;
+		}
+
+		Nfrrlib::EventBus::FListenerBinding Binding;
+		Binding.FunctionName = FunctionName;
+
+		const bool bResult = Subsystem->GetEventBus().AddListener(ChannelTag, ListenerObj, Binding);
+		if (bResult)
+		{
+			RecordListenerHistory(Subsystem, ChannelTag, ListenerObj, FunctionName);
+		}
+
+		UE_LOG(LogNFLEventBus, Log,
+			TEXT("BP %s result. Channel=%s Listener=%s Function=%s Success=%s"),
+			ApiName,
+			*ChannelTag.ToString(),
+			*GetNameSafe(ListenerObj),
+			*FunctionName.ToString(),
+			bResult ? TEXT("true") : TEXT("false"));
+		return bResult;
+	}
 }
 
 /**
@@ -117,7 +288,7 @@ bool UEventBusBlueprintLibrary::UnregisterChannel(UObject* WorldContextObject, c
 }
 
 /**
- * @brief Blueprint facade wrapper for allowlisted publisher registration.
+ * @brief Blueprint facade wrapper for publisher registration with runtime history tracking.
  */
 bool UEventBusBlueprintLibrary::AddPublisherValidated(
 	UObject* WorldContextObject,
@@ -125,59 +296,29 @@ bool UEventBusBlueprintLibrary::AddPublisherValidated(
 	UObject* PublisherObj,
 	const FName DelegatePropertyName)
 {
-	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP AddPublisherValidated request. Channel=%s Publisher=%s Delegate=%s"),
-		*ChannelTag.ToString(),
-		*GetNameSafe(PublisherObj),
-		*DelegatePropertyName.ToString());
+	return AddPublisherInternal(
+		WorldContextObject,
+		ChannelTag,
+		PublisherObj,
+		DelegatePropertyName,
+		TEXT("AddPublisherValidated"));
+}
 
-	UEventBusSubsystem* const Subsystem = ResolveSubsystem(WorldContextObject);
-	if (!::IsValid(Subsystem))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP AddPublisherValidated denied: subsystem resolution failed."));
-		return false;
-	}
-
-	if (!::IsValid(PublisherObj))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP AddPublisherValidated denied: PublisherObj is invalid."));
-		return false;
-	}
-
-	const UEventBusRegistryAsset* Registry = Subsystem->GetRegistry();
-	if (!::IsValid(Registry))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("AddPublisherValidated denied: registry is null. Channel=%s Publisher=%s Delegate=%s"),
-			*ChannelTag.ToString(),
-			*GetNameSafe(PublisherObj),
-			*DelegatePropertyName.ToString());
-		return false;
-	}
-
-	if (!Registry->IsPublisherAllowed(ChannelTag, PublisherObj->GetClass(), DelegatePropertyName))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("AddPublisherValidated denied: no allowlist match. Registry=%s Channel=%s PublisherClass=%s Delegate=%s"),
-			*GetNameSafe(Registry),
-			*ChannelTag.ToString(),
-			*GetNameSafe(PublisherObj->GetClass()),
-			*DelegatePropertyName.ToString());
-		return false;
-	}
-
-	Nfrrlib::EventBus::FPublisherBinding Binding;
-	Binding.DelegatePropertyName = DelegatePropertyName;
-	const bool bResult = Subsystem->GetEventBus().AddPublisher(ChannelTag, PublisherObj, Binding);
-	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP AddPublisherValidated result. Channel=%s Publisher=%s Delegate=%s Success=%s"),
-		*ChannelTag.ToString(),
-		*GetNameSafe(PublisherObj),
-		*DelegatePropertyName.ToString(),
-		bResult ? TEXT("true") : TEXT("false"));
-	return bResult;
+/**
+ * @brief Blueprint facade wrapper for publisher registration.
+ */
+bool UEventBusBlueprintLibrary::AddPublisher(
+	UObject* WorldContextObject,
+	const FGameplayTag ChannelTag,
+	UObject* PublisherObj,
+	const FName DelegatePropertyName)
+{
+	return AddPublisherInternal(
+		WorldContextObject,
+		ChannelTag,
+		PublisherObj,
+		DelegatePropertyName,
+		TEXT("AddPublisher"));
 }
 
 /**
@@ -197,6 +338,10 @@ bool UEventBusBlueprintLibrary::RemovePublisher(UObject* WorldContextObject, con
 			TEXT("BP RemovePublisher denied: subsystem resolution failed."));
 		return false;
 	}
+	if (!ValidateBindingInputs(TEXT("RemovePublisher"), TEXT("PublisherObj"), ChannelTag, PublisherObj))
+	{
+		return false;
+	}
 
 	const bool bResult = Subsystem->GetEventBus().RemovePublisher(ChannelTag, PublisherObj);
 	UE_LOG(LogNFLEventBus, Log,
@@ -208,7 +353,7 @@ bool UEventBusBlueprintLibrary::RemovePublisher(UObject* WorldContextObject, con
 }
 
 /**
- * @brief Blueprint facade wrapper for allowlisted listener registration.
+ * @brief Blueprint facade wrapper for listener registration with runtime history tracking.
  */
 bool UEventBusBlueprintLibrary::AddListenerValidated(
 	UObject* WorldContextObject,
@@ -216,59 +361,29 @@ bool UEventBusBlueprintLibrary::AddListenerValidated(
 	UObject* ListenerObj,
 	const FName FunctionName)
 {
-	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP AddListenerValidated request. Channel=%s Listener=%s Function=%s"),
-		*ChannelTag.ToString(),
-		*GetNameSafe(ListenerObj),
-		*FunctionName.ToString());
+	return AddListenerInternal(
+		WorldContextObject,
+		ChannelTag,
+		ListenerObj,
+		FunctionName,
+		TEXT("AddListenerValidated"));
+}
 
-	UEventBusSubsystem* const Subsystem = ResolveSubsystem(WorldContextObject);
-	if (!::IsValid(Subsystem))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP AddListenerValidated denied: subsystem resolution failed."));
-		return false;
-	}
-
-	if (!::IsValid(ListenerObj))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP AddListenerValidated denied: ListenerObj is invalid."));
-		return false;
-	}
-
-	const UEventBusRegistryAsset* Registry = Subsystem->GetRegistry();
-	if (!::IsValid(Registry))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("AddListenerValidated denied: registry is null. Channel=%s Listener=%s Func=%s"),
-			*ChannelTag.ToString(),
-			*GetNameSafe(ListenerObj),
-			*FunctionName.ToString());
-		return false;
-	}
-
-	if (!Registry->IsListenerAllowed(ChannelTag, ListenerObj->GetClass(), FunctionName))
-	{
-		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("AddListenerValidated denied: no allowlist match. Registry=%s Channel=%s ListenerClass=%s Func=%s"),
-			*GetNameSafe(Registry),
-			*ChannelTag.ToString(),
-			*GetNameSafe(ListenerObj->GetClass()),
-			*FunctionName.ToString());
-		return false;
-	}
-
-	Nfrrlib::EventBus::FListenerBinding Binding;
-	Binding.FunctionName = FunctionName;
-	const bool bResult = Subsystem->GetEventBus().AddListener(ChannelTag, ListenerObj, Binding);
-	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP AddListenerValidated result. Channel=%s Listener=%s Function=%s Success=%s"),
-		*ChannelTag.ToString(),
-		*GetNameSafe(ListenerObj),
-		*FunctionName.ToString(),
-		bResult ? TEXT("true") : TEXT("false"));
-	return bResult;
+/**
+ * @brief Blueprint facade wrapper for listener registration.
+ */
+bool UEventBusBlueprintLibrary::AddListener(
+	UObject* WorldContextObject,
+	const FGameplayTag ChannelTag,
+	UObject* ListenerObj,
+	const FName FunctionName)
+{
+	return AddListenerInternal(
+		WorldContextObject,
+		ChannelTag,
+		ListenerObj,
+		FunctionName,
+		TEXT("AddListener"));
 }
 
 /**
@@ -293,6 +408,10 @@ bool UEventBusBlueprintLibrary::RemoveListener(
 			TEXT("BP RemoveListener denied: subsystem resolution failed."));
 		return false;
 	}
+	if (!ValidateBindingInputs(TEXT("RemoveListener"), TEXT("ListenerObj"), ChannelTag, ListenerObj))
+	{
+		return false;
+	}
 
 	Nfrrlib::EventBus::FListenerBinding Binding;
 	Binding.FunctionName = FunctionName;
@@ -307,15 +426,15 @@ bool UEventBusBlueprintLibrary::RemoveListener(
 }
 
 /**
- * @brief Returns sorted, deduplicated allowlisted listener functions for a class on a channel.
+ * @brief Returns sorted, deduplicated listener functions recorded in runtime history.
  */
-TArray<FName> UEventBusBlueprintLibrary::GetAllowedListenerFunctions(
+TArray<FName> UEventBusBlueprintLibrary::GetKnownListenerFunctions(
 	UObject* WorldContextObject,
 	const FGameplayTag ChannelTag,
 	const TSubclassOf<UObject> ListenerClass)
 {
 	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP GetAllowedListenerFunctions request. Channel=%s ListenerClass=%s"),
+		TEXT("BP GetKnownListenerFunctions request. Channel=%s ListenerClass=%s"),
 		*ChannelTag.ToString(),
 		*GetNameSafe(ListenerClass.Get()));
 
@@ -323,25 +442,28 @@ TArray<FName> UEventBusBlueprintLibrary::GetAllowedListenerFunctions(
 	if (!::IsValid(Subsystem))
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP GetAllowedListenerFunctions denied: subsystem resolution failed."));
+			TEXT("BP GetKnownListenerFunctions denied: subsystem resolution failed."));
 		return {};
 	}
 
-	const UEventBusRegistryAsset* Registry = Subsystem->GetRegistry();
-	if (!::IsValid(Registry))
+	const UEventBusRegistryAsset* Registry = Subsystem->GetRuntimeRegistry();
+	TArray<FName> KnownFunctions;
+	if (::IsValid(Registry))
+	{
+		KnownFunctions = Registry->GetKnownListenerFunctions(ChannelTag, ListenerClass.Get());
+	}
+	else
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("BP GetAllowedListenerFunctions denied: registry is null."));
-		return {};
+			TEXT("BP GetKnownListenerFunctions warning: runtime registry is null, returning empty list."));
 	}
 
-	TArray<FName> AllowedFunctions = Registry->GetAllowedListenerFunctions(ChannelTag, ListenerClass.Get());
 	UE_LOG(LogNFLEventBus, Log,
-		TEXT("BP GetAllowedListenerFunctions result. Channel=%s ListenerClass=%s Count=%d"),
+		TEXT("BP GetKnownListenerFunctions result. Channel=%s ListenerClass=%s Count=%d"),
 		*ChannelTag.ToString(),
 		*GetNameSafe(ListenerClass.Get()),
-		AllowedFunctions.Num());
-	return AllowedFunctions;
+		KnownFunctions.Num());
+	return KnownFunctions;
 }
 
 /**

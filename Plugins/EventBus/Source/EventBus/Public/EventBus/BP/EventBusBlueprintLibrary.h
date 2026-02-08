@@ -27,25 +27,33 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool UnregisterChannel(UObject* WorldContextObject, FGameplayTag ChannelTag);
 
-	/** @brief Adds an allowlisted publisher delegate binding to one channel. */
+	/** @brief Adds one publisher delegate binding and records it in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddPublisherValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
+
+	/** @brief Adds one publisher delegate binding to one channel. */
+	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
+	static bool AddPublisher(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
 
 	/** @brief Removes one publisher from one channel. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool RemovePublisher(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj);
 
-	/** @brief Adds an allowlisted listener function binding to one channel. */
+	/** @brief Adds one listener function binding and records it in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddListenerValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
+
+	/** @brief Adds one listener function binding to one channel. */
+	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
+	static bool AddListener(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 
 	/** @brief Removes one listener function binding from one channel. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool RemoveListener(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 
-	/** @brief Returns allowlisted listener functions for a channel/class pair. */
+	/** @brief Returns listener functions recorded in runtime history for a channel/class pair. */
 	UFUNCTION(BlueprintPure, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
-	static TArray<FName> GetAllowedListenerFunctions(UObject* WorldContextObject, FGameplayTag ChannelTag, TSubclassOf<UObject> ListenerClass);
+	static TArray<FName> GetKnownListenerFunctions(UObject* WorldContextObject, FGameplayTag ChannelTag, TSubclassOf<UObject> ListenerClass);
 
 private:
 	/** @brief Resolves EventBus subsystem from world context for all static Blueprint API entry points. */

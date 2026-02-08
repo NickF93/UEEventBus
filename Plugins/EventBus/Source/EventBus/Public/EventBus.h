@@ -4,11 +4,14 @@
 
 #include "Modules/ModuleManager.h"
 
+/**
+ * @brief Runtime module entry point for EventBus plugin.
+ */
 class FEventBusModule : public IModuleInterface
 {
 public:
-
-	/** IModuleInterface implementation */
+	/** @brief Called when module is loaded by Unreal module manager. */
 	virtual void StartupModule() override;
+	/** @brief Called when module is unloading during shutdown/hot-reload. */
 	virtual void ShutdownModule() override;
 };

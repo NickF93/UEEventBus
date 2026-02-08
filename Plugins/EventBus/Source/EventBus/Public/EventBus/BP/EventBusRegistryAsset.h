@@ -7,43 +7,46 @@
 #include "EventBusRegistryAsset.generated.h"
 
 USTRUCT(BlueprintType)
-struct EVENTBUS_API FEventBusPublisherRule
+struct EVENTBUS_API FEventBusPublisherHistoryEntry
 {
 	GENERATED_BODY()
 
-	/** @brief Channel rule scope. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
+	/** @brief Channel for this publisher binding history entry. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
 	FGameplayTag ChannelTag;
 
-	/** @brief Allowed publisher class (subclasses are accepted). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
+	/** @brief Publisher class recorded for this channel/delegate binding. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
 	TSubclassOf<UObject> PublisherClass;
 
-	/** @brief Allowed multicast delegate property name on publisher class. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
+	/** @brief Publisher multicast delegate property name recorded for this binding. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
 	FName DelegatePropertyName = NAME_None;
 };
 
 USTRUCT(BlueprintType)
-struct EVENTBUS_API FEventBusListenerRule
+struct EVENTBUS_API FEventBusListenerHistoryEntry
 {
 	GENERATED_BODY()
 
-	/** @brief Channel rule scope. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
+	/** @brief Channel for this listener binding history entry. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
 	FGameplayTag ChannelTag;
 
-	/** @brief Allowed listener class (subclasses are accepted). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
+	/** @brief Listener class recorded for this channel. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
 	TSubclassOf<UObject> ListenerClass;
 
-	/** @brief Allowed listener function names for this class/channel rule. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
-	TArray<FName> AllowedFunctions;
+	/** @brief Listener function names recorded for this class/channel pair. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "EventBus")
+	TArray<FName> KnownFunctions;
 };
 
 /**
- * @brief Governance asset used by Blueprint-facing API validation.
+ * @brief Runtime history registry for blueprint channel/publisher/listener bindings.
+ *
+ * This object is not used as a manual rule table. It is populated dynamically
+ * at runtime when successful binds occur.
  */
 UCLASS(BlueprintType)
 class EVENTBUS_API UEventBusRegistryAsset : public UDataAsset
@@ -51,22 +54,22 @@ class EVENTBUS_API UEventBusRegistryAsset : public UDataAsset
 	GENERATED_BODY()
 
 public:
-	/** @brief Returns true when publisher class and delegate property are allowlisted on channel. */
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "EventBus")
-	bool IsPublisherAllowed(const FGameplayTag& ChannelTag, UClass* PublisherClass, FName DelegatePropertyName) const;
+	/** @brief Records one publisher binding into runtime history. */
+	UFUNCTION(BlueprintCallable, Category = "EventBus")
+	void RecordPublisherBinding(const FGameplayTag& ChannelTag, UClass* PublisherClass, FName DelegatePropertyName);
 
-	/** @brief Returns true when listener class/function are allowlisted on channel. */
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "EventBus")
-	bool IsListenerAllowed(const FGameplayTag& ChannelTag, UClass* ListenerClass, FName FunctionName) const;
+	/** @brief Records one listener function binding into runtime history. */
+	UFUNCTION(BlueprintCallable, Category = "EventBus")
+	void RecordListenerBinding(const FGameplayTag& ChannelTag, UClass* ListenerClass, FName FunctionName);
 
-	/** @brief Returns deduplicated/sorted allowlisted function names for a listener class on channel. */
+	/** @brief Returns deduplicated/sorted listener functions recorded for a class on a channel. */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "EventBus")
-	TArray<FName> GetAllowedListenerFunctions(const FGameplayTag& ChannelTag, UClass* ListenerClass) const;
+	TArray<FName> GetKnownListenerFunctions(const FGameplayTag& ChannelTag, UClass* ListenerClass) const;
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
-	TArray<FEventBusPublisherRule> PublisherRules;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "EventBus|History")
+	TArray<FEventBusPublisherHistoryEntry> PublisherHistory;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "EventBus")
-	TArray<FEventBusListenerRule> ListenerRules;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "EventBus|History")
+	TArray<FEventBusListenerHistoryEntry> ListenerHistory;
 };

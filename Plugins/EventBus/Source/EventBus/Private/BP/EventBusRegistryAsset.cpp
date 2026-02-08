@@ -5,153 +5,129 @@
 #include "EventBus/Core/EventBus.h"
 
 /**
- * @brief Checks publisher allowlist rule match for channel/class/delegate property tuple.
+ * @brief Records one publisher binding in history if valid and not already present.
  */
-bool UEventBusRegistryAsset::IsPublisherAllowed(
+void UEventBusRegistryAsset::RecordPublisherBinding(
 	const FGameplayTag& ChannelTag,
 	UClass* PublisherClass,
-	const FName DelegatePropertyName) const
+	const FName DelegatePropertyName)
 {
 	if (!ChannelTag.IsValid() || !::IsValid(PublisherClass) || DelegatePropertyName.IsNone())
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("Registry IsPublisherAllowed invalid input. Registry=%s Channel=%s PublisherClass=%s Delegate=%s"),
+			TEXT("Registry RecordPublisherBinding invalid input. Registry=%s Channel=%s PublisherClass=%s Delegate=%s"),
 			*GetNameSafe(this),
 			*ChannelTag.ToString(),
 			*GetNameSafe(PublisherClass),
 			*DelegatePropertyName.ToString());
-		return false;
+		return;
 	}
 
-	int32 ScannedRules = 0;
-	for (const FEventBusPublisherRule& Rule : PublisherRules)
+	for (const FEventBusPublisherHistoryEntry& Entry : PublisherHistory)
 	{
-		++ScannedRules;
-		if (!Rule.ChannelTag.IsValid() || Rule.DelegatePropertyName.IsNone())
+		if (Entry.ChannelTag == ChannelTag &&
+			Entry.PublisherClass.Get() == PublisherClass &&
+			Entry.DelegatePropertyName == DelegatePropertyName)
 		{
-			continue;
-		}
-
-		UClass* const RuleClass = Rule.PublisherClass.Get();
-		if (!::IsValid(RuleClass))
-		{
-			continue;
-		}
-
-		if (Rule.ChannelTag == ChannelTag &&
-			PublisherClass->IsChildOf(RuleClass) &&
-			Rule.DelegatePropertyName == DelegatePropertyName)
-		{
-			UE_LOG(LogNFLEventBus, Log,
-				TEXT("Registry IsPublisherAllowed matched. Registry=%s Channel=%s PublisherClass=%s Delegate=%s RuleClass=%s"),
-				*GetNameSafe(this),
-				*ChannelTag.ToString(),
-				*GetNameSafe(PublisherClass),
-				*DelegatePropertyName.ToString(),
-				*GetNameSafe(RuleClass));
-			return true;
+			return;
 		}
 	}
 
-	UE_LOG(LogNFLEventBus, Warning,
-		TEXT("Registry IsPublisherAllowed denied. Registry=%s Channel=%s PublisherClass=%s Delegate=%s RulesScanned=%d"),
+	FEventBusPublisherHistoryEntry NewEntry;
+	NewEntry.ChannelTag = ChannelTag;
+	NewEntry.PublisherClass = PublisherClass;
+	NewEntry.DelegatePropertyName = DelegatePropertyName;
+	PublisherHistory.Add(MoveTemp(NewEntry));
+
+	UE_LOG(LogNFLEventBus, Log,
+		TEXT("Registry RecordPublisherBinding added. Registry=%s Channel=%s PublisherClass=%s Delegate=%s Total=%d"),
 		*GetNameSafe(this),
 		*ChannelTag.ToString(),
 		*GetNameSafe(PublisherClass),
 		*DelegatePropertyName.ToString(),
-		ScannedRules);
-	return false;
+		PublisherHistory.Num());
 }
 
 /**
- * @brief Checks listener allowlist rule match for channel/class/function tuple.
+ * @brief Records one listener function binding in history.
  */
-bool UEventBusRegistryAsset::IsListenerAllowed(
+void UEventBusRegistryAsset::RecordListenerBinding(
 	const FGameplayTag& ChannelTag,
 	UClass* ListenerClass,
-	const FName FunctionName) const
+	const FName FunctionName)
 {
 	if (!ChannelTag.IsValid() || !::IsValid(ListenerClass) || FunctionName.IsNone())
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("Registry IsListenerAllowed invalid input. Registry=%s Channel=%s ListenerClass=%s Function=%s"),
+			TEXT("Registry RecordListenerBinding invalid input. Registry=%s Channel=%s ListenerClass=%s Function=%s"),
 			*GetNameSafe(this),
 			*ChannelTag.ToString(),
 			*GetNameSafe(ListenerClass),
 			*FunctionName.ToString());
-		return false;
+		return;
 	}
 
-	int32 ScannedRules = 0;
-	for (const FEventBusListenerRule& Rule : ListenerRules)
+	FEventBusListenerHistoryEntry* FoundEntry = ListenerHistory.FindByPredicate(
+		[&ChannelTag, ListenerClass](const FEventBusListenerHistoryEntry& Entry)
+		{
+			return Entry.ChannelTag == ChannelTag && Entry.ListenerClass.Get() == ListenerClass;
+		});
+
+	if (!FoundEntry)
 	{
-		++ScannedRules;
-		if (!Rule.ChannelTag.IsValid())
-		{
-			continue;
-		}
-
-		UClass* const RuleClass = Rule.ListenerClass.Get();
-		if (!::IsValid(RuleClass))
-		{
-			continue;
-		}
-
-		if (Rule.ChannelTag != ChannelTag || !ListenerClass->IsChildOf(RuleClass))
-		{
-			continue;
-		}
-
-		if (Rule.AllowedFunctions.Contains(FunctionName))
-		{
-			UE_LOG(LogNFLEventBus, Log,
-				TEXT("Registry IsListenerAllowed matched. Registry=%s Channel=%s ListenerClass=%s Function=%s RuleClass=%s"),
-				*GetNameSafe(this),
-				*ChannelTag.ToString(),
-				*GetNameSafe(ListenerClass),
-				*FunctionName.ToString(),
-				*GetNameSafe(RuleClass));
-			return true;
-		}
+		FEventBusListenerHistoryEntry NewEntry;
+		NewEntry.ChannelTag = ChannelTag;
+		NewEntry.ListenerClass = ListenerClass;
+		ListenerHistory.Add(MoveTemp(NewEntry));
+		FoundEntry = &ListenerHistory.Last();
 	}
 
-	UE_LOG(LogNFLEventBus, Warning,
-		TEXT("Registry IsListenerAllowed denied. Registry=%s Channel=%s ListenerClass=%s Function=%s RulesScanned=%d"),
+	if (!FoundEntry->KnownFunctions.Contains(FunctionName))
+	{
+		FoundEntry->KnownFunctions.Add(FunctionName);
+		FoundEntry->KnownFunctions.Sort([](const FName& A, const FName& B)
+		{
+			return A.Compare(B) < 0;
+		});
+	}
+
+	UE_LOG(LogNFLEventBus, Log,
+		TEXT("Registry RecordListenerBinding updated. Registry=%s Channel=%s ListenerClass=%s Function=%s KnownCount=%d"),
 		*GetNameSafe(this),
 		*ChannelTag.ToString(),
 		*GetNameSafe(ListenerClass),
 		*FunctionName.ToString(),
-		ScannedRules);
-	return false;
+		FoundEntry->KnownFunctions.Num());
 }
 
 /**
- * @brief Collects, deduplicates, and sorts allowlisted listener function names.
+ * @brief Returns deduplicated/sorted listener functions recorded for class/channel.
  */
-TArray<FName> UEventBusRegistryAsset::GetAllowedListenerFunctions(const FGameplayTag& ChannelTag, UClass* ListenerClass) const
+TArray<FName> UEventBusRegistryAsset::GetKnownListenerFunctions(const FGameplayTag& ChannelTag, UClass* ListenerClass) const
 {
 	TArray<FName> Result;
 	if (!ChannelTag.IsValid() || !::IsValid(ListenerClass))
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("Registry GetAllowedListenerFunctions invalid input. Registry=%s Channel=%s ListenerClass=%s"),
+			TEXT("Registry GetKnownListenerFunctions invalid input. Registry=%s Channel=%s ListenerClass=%s"),
 			*GetNameSafe(this),
 			*ChannelTag.ToString(),
 			*GetNameSafe(ListenerClass));
 		return Result;
 	}
 
-	for (const FEventBusListenerRule& Rule : ListenerRules)
+	for (const FEventBusListenerHistoryEntry& Entry : ListenerHistory)
 	{
-		UClass* const RuleClass = Rule.ListenerClass.Get();
-		if (!::IsValid(RuleClass))
+		UClass* const EntryClass = Entry.ListenerClass.Get();
+		if (!::IsValid(EntryClass))
 		{
 			continue;
 		}
 
-		if (Rule.ChannelTag == ChannelTag && ListenerClass->IsChildOf(RuleClass))
+		// Keep lookup strict to class-local history so picker results do not include inherited members.
+		if (Entry.ChannelTag == ChannelTag && ListenerClass == EntryClass)
 		{
-			Result.Append(Rule.AllowedFunctions);
+			Result.Append(Entry.KnownFunctions);
 		}
 	}
 
@@ -168,7 +144,7 @@ TArray<FName> UEventBusRegistryAsset::GetAllowedListenerFunctions(const FGamepla
 	});
 
 	UE_LOG(LogNFLEventBus, Log,
-		TEXT("Registry GetAllowedListenerFunctions result. Registry=%s Channel=%s ListenerClass=%s Count=%d"),
+		TEXT("Registry GetKnownListenerFunctions result. Registry=%s Channel=%s ListenerClass=%s Count=%d"),
 		*GetNameSafe(this),
 		*ChannelTag.ToString(),
 		*GetNameSafe(ListenerClass),

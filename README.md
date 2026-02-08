@@ -1,17 +1,10 @@
-# UEEventBus
+﻿# UEEventBus
 
-UEEventBus is a sample Unreal project hosting the **EventBus v2** plugin (full replacement architecture).
+UEEventBus is a sample Unreal project that hosts the EventBus v2 plugin.
 
-The project includes:
+## Compatibility
 
-1. EventBus plugin runtime/core implementation.
-2. Typed C++ API for static channel contracts.
-3. Blueprint facade with registry-controlled binding.
-4. Toy hybrid sample (C++ publisher/listener + Blueprint-capable listener path).
-
-## Compatibility Matrix
-
-- Unreal Engine: `>= 5.5` (target baseline configured to 5.5)
+- Unreal Engine: `>= 5.5`
 - C++: `>= 20`
 
 ## Mandatory Engineering Constraints
@@ -31,39 +24,26 @@ The project includes:
 13. Apply DRY best practices and avoid unnecessary repetition.
 14. Avoid dead or unreachable code.
 
-## Repository Structure
+## Runtime Model
 
-```text
-UEEventBus/
-|- Plugins/EventBus/
-|  |- Source/EventBus/Public/EventBus/Core/*
-|  |- Source/EventBus/Public/EventBus/Typed/*
-|  |- Source/EventBus/Public/EventBus/BP/*
-|  `- Source/EventBus/Private/*
-|- Source/UEEventBus/
-|  |- EventBusToyTags.*
-|  |- EventBusToyChannels.h
-|  |- ToyStatsPublisherComponent.*
-|  `- ToyCppListenerActor.*
-`- docs/
-   |- EventBus_v2_Architecture.md
-   `- EventBus_v2_API.md
-```
+EventBus is channel-driven:
 
-## Architectural Overview
+1. Register channel.
+2. Register publisher(s).
+3. Register listener(s).
+4. Unregister listener(s).
+5. Unregister publisher(s).
+
+The plugin keeps an internal runtime history of successful bindings for BP ergonomics. No manual registry setup is required.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    Core[FEventBus Core]
-    Typed[TEventChannelApi + ChannelDef]
-    BP[Blueprint Library + Subsystem]
-    Registry[Registry Data Asset]
-    Game[Game Code / Actors / Components]
-
-    Typed --> Core
-    BP --> Core
-    BP --> Registry
-    Game --> Typed
+    Typed[Typed C++ API] --> Core[FEventBus Core]
+    BP[Blueprint Library + Subsystem] --> Core
+    Editor[Filtered Custom K2 Nodes] --> BP
+    Game[Game Actors/Components] --> Typed
     Game --> BP
 ```
 
@@ -71,135 +51,39 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    P1[Publisher UObject] -->|multicast delegate| CH[Channel / EventBus]
-    P2[Publisher UObject] -->|multicast delegate| CH
-    CH -->|callback| L1[Listener UObject::Function]
-    CH -->|callback| L2[Listener UObject::Function]
-    CH -->|callback| L3[Listener UObject::Function]
+    P[Publisher UObject + Dispatcher] --> CH[Channel: FGameplayTag]
+    CH --> L1[Listener UObject::Function]
+    CH --> L2[Listener UObject::Function]
 ```
 
-The runtime is channel-based:
+## Plugin Files
 
-- Channel key: `FGameplayTag`
-- Publisher identity: UObject + multicast delegate property name
-- Listener identity: UObject + function name (`FObjectKey + FName` internal key)
-- Policy: per-channel `bOwnsPublisherDelegates`
-- Channel signature is inferred from first publisher delegate and enforced thereafter
-- C++ attribute aliases are centralized in `EventBus/Core/EventBusAttributes.h`
+- Runtime API: `Plugins/EventBus/Source/EventBus/Public/EventBus/*`
+- Runtime implementation: `Plugins/EventBus/Source/EventBus/Private/*`
+- Editor nodes: `Plugins/EventBus/Source/EventBusEditor/*`
 
-## EventBus v2 API (Canonical)
+## Blueprint API
 
-1. `RegisterChannel(ChannelTag, bOwnsPublisherDelegates) -> bool`
-2. `UnregisterChannel(ChannelTag) -> bool`
-3. `AddPublisher(ChannelTag, PublisherInstance, DelegateBinding) -> bool`
-4. `RemovePublisher(ChannelTag, PublisherInstance) -> bool`
-5. `AddListener(ChannelTag, ListenerInstance, ListenerFunction) -> bool`
-6. `RemoveListener(ChannelTag, ListenerInstance, ListenerFunction) -> bool`
+`UEventBusBlueprintLibrary` exposes:
 
-## C++ Integration Quick Start
+- `RegisterChannel`
+- `UnregisterChannel`
+- `AddPublisherValidated`
+- `AddPublisher`
+- `RemovePublisher`
+- `AddListenerValidated`
+- `AddListener`
+- `RemoveListener`
+- `GetKnownListenerFunctions`
 
-### 1) Declare gameplay tags
+## Notes
 
-```cpp
-UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Toy_HealthChanged);
-```
+- Validated APIs perform runtime checks and do not require pre-authored rule tables.
+- Channel signature is inferred by first publisher delegate bound on channel.
+- Listener identity is tracked by instance + function.
 
-### 2) Define channel contract
+## Docs
 
-```cpp
-NFL_DECLARE_EVENTBUS_CHANNEL(
-    FToyHealthChangedChannel,
-    FOnToyHealthChanged,
-    UToyStatsPublisherComponent,
-    TAG_Event_Toy_HealthChanged,
-    OnToyHealthChanged
-);
-```
-
-### 3) Register + bind
-
-```cpp
-using namespace Nfrrlib::EventBus;
-
-FEventBus& Bus = EventBusSubsystem->GetEventBus();
-TEventChannelApi<FToyHealthChangedChannel>::Register(Bus, false);
-TEventChannelApi<FToyHealthChangedChannel>::AddPublisher(Bus, PublisherComp);
-NFL_EVENTBUS_ADD_LISTENER(Bus, FToyHealthChangedChannel, this, AToyCppListenerActor, OnHealthChanged);
-```
-
-## Blueprint Integration Guide
-
-### Step A: Create registry
-
-Create a `UEventBusRegistryAsset` and configure:
-
-- Publisher rules:
-  - `ChannelTag`
-  - `PublisherClass` (`TSubclassOf<UObject>`)
-  - `DelegatePropertyName`
-- Listener rules:
-  - `ChannelTag`
-  - `ListenerClass` (`TSubclassOf<UObject>`)
-  - `AllowedFunctions` array
-
-### Step B: Set subsystem registry
-
-In startup Blueprint:
-
-1. Get `GameInstance`
-2. Get `EventBusSubsystem`
-3. Call `SetRegistry(RegistryAsset)`
-
-### Step C: Register/bind via nodes
-
-Use `UEventBusBlueprintLibrary` nodes:
-
-1. `RegisterChannel`
-2. `AddPublisherValidated`
-3. `AddListenerValidated`
-4. `RemoveListener`
-5. `RemovePublisher`
-6. `UnregisterChannel`
-
-### Blueprint wiring diagram
-
-```mermaid
-flowchart TD
-    Start[BeginPlay] --> GI[Get GameInstance]
-    GI --> Sub[Get EventBusSubsystem]
-    Sub --> SetReg[SetRegistry]
-    SetReg --> RegChannel[RegisterChannel]
-    RegChannel --> AddPub[AddPublisherValidated]
-    AddPub --> AddLis[AddListenerValidated]
-    AddLis --> Broadcast[Publisher Delegate Broadcast]
-    Broadcast --> Callback[Listener Function Executes]
-    Callback --> End[EndPlay]
-    End --> Unbind[RemoveListener / RemovePublisher]
-```
-
-## Toy Example Included
-
-The sample includes:
-
-- `UToyStatsPublisherComponent`: exposes `OnToyHealthChanged`, `OnToyStaminaChanged` delegates and broadcasts on updates.
-- `AToyCppListenerActor`: binds with typed macro syntax (`NFL_EVENTBUS_ADD_LISTENER(..., AToyCppListenerActor, OnHealthChanged)`).
-- Gameplay tags and typed channels under `Source/UEEventBus/EventBusToy*`.
-
-Expected runtime behavior:
-
-1. Publisher component registers channels and itself as publisher in `BeginPlay`.
-2. C++ listener registers typed callbacks in `BeginPlay`.
-3. Delegate broadcasts route through EventBus channel to listeners.
-4. Teardown removes listener/publisher bindings in `EndPlay`.
-
-## Build and Validation Notes
-
-- If you see duplicate filename conflicts in non-unity builds, ensure there is no duplicate `.cpp` basename under the same module.
-- Plugin module entry implementation file is `Plugins/EventBus/Source/EventBus/Private/EventBusModule.cpp`.
-- Core runtime implementation file is `Plugins/EventBus/Source/EventBus/Private/Core/EventBus.cpp`.
-
-## Documentation Index
-
-- Architecture details: `docs/EventBus_v2_Architecture.md`
-- API reference and examples: `docs/EventBus_v2_API.md`
-- Plugin-specific detailed guide: `Plugins/EventBus/README.md`
+- `Plugins/EventBus/README.md`
+- `docs/EventBus_v2_Architecture.md`
+- `docs/EventBus_v2_API.md`

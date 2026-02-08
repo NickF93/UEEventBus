@@ -1,4 +1,4 @@
-# EventBus v2 API Quick Reference
+﻿# EventBus v2 API Reference
 
 ## Mandatory Constraints (1-14)
 
@@ -31,12 +31,12 @@ Bus.UnregisterChannel(ChannelTag);
 Bus.Reset();
 ```
 
-### Runtime validation rules
+### Runtime Rules
 
-- Channel must be registered before Add/Remove publisher/listener.
-- Channel signature is inferred from first publisher delegate bound on the channel.
-- New listeners/publishers must be signature-compatible with channel signature.
-- Listener identity key is `FObjectKey + FName` (stable across object rename).
+- Channel must be registered before add/remove publisher/listener calls.
+- Channel signature is inferred from first valid publisher delegate bound on that channel.
+- Listener/publisher bindings must remain signature-compatible.
+- Listener identity key is `FObjectKey + FName`.
 
 ## Typed C++ API
 
@@ -52,38 +52,40 @@ NFL_EVENTBUS_ADD_LISTENER(Bus, FMyChannel, Listener, UMyListenerClass, OnMyEvent
 NFL_EVENTBUS_REMOVE_LISTENER(Bus, FMyChannel, Listener, UMyListenerClass, OnMyEvent);
 ```
 
-Typed listener helper contract:
+Typed helper contract:
 
-- `NFL_EVENTBUS_METHOD(ClassType, FunctionName)` uses:
-- `&ClassType::FunctionName` and `GET_FUNCTION_NAME_CHECKED(ClassType, FunctionName)`.
-- No pointer-string parsing workaround is used.
+- `NFL_EVENTBUS_METHOD(ClassType, FunctionName)` resolves pointer + checked name.
+- No pointer-string parsing is used.
 
 ## Blueprint API
+
+`UEventBusBlueprintLibrary`:
 
 - `RegisterChannel`
 - `UnregisterChannel`
 - `AddPublisherValidated`
+- `AddPublisher`
 - `RemovePublisher`
 - `AddListenerValidated`
+- `AddListener`
 - `RemoveListener`
-- `GetAllowedListenerFunctions`
+- `GetKnownListenerFunctions`
 
-All validated BP APIs require `UEventBusRegistryAsset` allowlist rules.
+Validated methods do runtime checks and record successful binds into runtime history.
+No pre-authored rule table setup is required.
 
-Registry model:
+## Editor Filtered Nodes
 
-- Publisher rules use `TSubclassOf<UObject>` + delegate property name.
-- Listener rules use `TSubclassOf<UObject>` + allowed function names.
+- `Add Publisher Validated (Filtered)`:
+  - delegate picker lists delegates declared on selected publisher class only.
+- `Add Listener Validated (Filtered)`:
+  - function picker lists functions declared on selected listener class only.
 
 ## C++20 Attribute Aliases
 
-EventBus v2 centralizes attributes in:
-
-- `EventBus/Core/EventBusAttributes.h`
-
-Aliases:
+`EventBus/Core/EventBusAttributes.h`:
 
 - `NFL_EVENTBUS_MAYBE_UNUSED`
 - `NFL_EVENTBUS_NODISCARD`
-- `NFL_EVENTBUS_NODISCARD_MSG("reason")`
+- `NFL_EVENTBUS_NODISCARD_MSG(...)`
 - `NFL_EVENTBUS_UNUSED(Value)`

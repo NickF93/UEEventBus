@@ -27,17 +27,15 @@ public:
 	/** @brief Returns mutable EventBus runtime owned by this subsystem. */
 	NFL_EVENTBUS_NODISCARD
 	Nfrrlib::EventBus::FEventBus& GetEventBus();
-	/** @brief Returns active registry asset used for Blueprint allowlist validation. */
+	/** @brief Returns active runtime history store used by Blueprint APIs. */
 	NFL_EVENTBUS_NODISCARD
-	const UEventBusRegistryAsset* GetRegistry() const;
-
-	/** @brief Sets allowlist registry used by blueprint-validated bind operations. */
-	UFUNCTION(BlueprintCallable, Category = "EventBus")
-	void SetRegistry(UEventBusRegistryAsset* InRegistry);
+	const UEventBusRegistryAsset* GetRuntimeRegistry() const;
 
 private:
+	/** @brief Core runtime orchestrator owned by this game-instance subsystem. */
 	Nfrrlib::EventBus::FEventBus EventBus;
 
-	UPROPERTY(EditAnywhere, Category = "EventBus")
-	TObjectPtr<UEventBusRegistryAsset> Registry;
+	/** @brief Transient runtime history store used by BP helpers and filtered picker nodes. */
+	UPROPERTY(Transient)
+	TObjectPtr<UEventBusRegistryAsset> RuntimeRegistry;
 };

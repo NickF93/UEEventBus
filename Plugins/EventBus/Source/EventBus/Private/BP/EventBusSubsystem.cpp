@@ -4,8 +4,6 @@
 
 #include "EventBus/BP/EventBusRegistryAsset.h"
 
-#include "EventBus/Core/EventBus.h"
-
 /**
  * @brief Emits subsystem startup diagnostics for runtime tracing.
  */
@@ -13,10 +11,19 @@ void UEventBusSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
+	if (!::IsValid(RuntimeRegistry.Get()))
+	{
+		RuntimeRegistry = NewObject<UEventBusRegistryAsset>(
+			this,
+			UEventBusRegistryAsset::StaticClass(),
+			NAME_None,
+			RF_Transient);
+	}
+
 	UE_LOG(LogNFLEventBus, Log,
-		TEXT("EventBusSubsystem::Initialize. GameInstance=%s InitialRegistry=%s"),
+		TEXT("EventBusSubsystem::Initialize. GameInstance=%s RuntimeRegistry=%s"),
 		*GetNameSafe(GetGameInstance()),
-		*GetNameSafe(Registry.Get()));
+		*GetNameSafe(RuntimeRegistry.Get()));
 }
 
 /**
@@ -25,11 +32,12 @@ void UEventBusSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UEventBusSubsystem::Deinitialize()
 {
 	UE_LOG(LogNFLEventBus, Log,
-		TEXT("EventBusSubsystem::Deinitialize. GameInstance=%s ActiveRegistry=%s"),
+		TEXT("EventBusSubsystem::Deinitialize. GameInstance=%s RuntimeRegistry=%s"),
 		*GetNameSafe(GetGameInstance()),
-		*GetNameSafe(Registry.Get()));
+		*GetNameSafe(RuntimeRegistry.Get()));
 
 	EventBus.Reset();
+	RuntimeRegistry = nullptr;
 	Super::Deinitialize();
 }
 
@@ -42,22 +50,9 @@ Nfrrlib::EventBus::FEventBus& UEventBusSubsystem::GetEventBus()
 }
 
 /**
- * @brief Returns active registry asset used for blueprint allowlist checks.
+ * @brief Returns active runtime registry used for blueprint bind history.
  */
-const UEventBusRegistryAsset* UEventBusSubsystem::GetRegistry() const
+const UEventBusRegistryAsset* UEventBusSubsystem::GetRuntimeRegistry() const
 {
-	return Registry.Get();
-}
-
-/**
- * @brief Assigns registry asset used by blueprint validated operations.
- */
-void UEventBusSubsystem::SetRegistry(UEventBusRegistryAsset* InRegistry)
-{
-	UE_LOG(LogNFLEventBus, Display,
-		TEXT("EventBusSubsystem::SetRegistry. Previous=%s New=%s"),
-		*GetNameSafe(Registry.Get()),
-		*GetNameSafe(InRegistry));
-
-	Registry = InRegistry;
+	return RuntimeRegistry.Get();
 }
