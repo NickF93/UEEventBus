@@ -46,21 +46,21 @@ EventBus v2 is a channel-driven pub/sub plugin for Unreal Engine with strict lif
 ```mermaid
 flowchart LR
     subgraph Publishers
-        P1[Publisher A\nUObject + Delegate Property]
-        P2[Publisher B\nUObject + Delegate Property]
+        P1["Publisher A<br/>UObject + Delegate Property"]
+        P2["Publisher B<br/>UObject + Delegate Property"]
     end
 
     subgraph EventBus
-        C[Channel\nFGameplayTag]
+        C["Channel<br/>FGameplayTag"]
         S[FEventChannelState]
-        H[Runtime History\n(channel, class, member)]
+        H["Runtime History<br/>(channel, class, member)"]
         C --> S
         S --> H
     end
 
     subgraph Listeners
-        L1[Listener A\nUObject + Function]
-        L2[Listener B\nUObject + Function]
+        L1["Listener A<br/>UObject + Function"]
+        L2["Listener B<br/>UObject + Function"]
     end
 
     P1 -->|AddPublisher| C
