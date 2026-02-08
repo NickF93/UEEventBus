@@ -40,13 +40,13 @@ void UToyStatsPublisherComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UWorld* const World = GetWorld();
+	const UWorld* const World = GetWorld();
 	if (!::IsValid(World))
 	{
 		return;
 	}
 
-	UGameInstance* const GameInstance = World->GetGameInstance();
+	const UGameInstance* const GameInstance = World->GetGameInstance();
 	if (!::IsValid(GameInstance))
 	{
 		return;
@@ -80,10 +80,10 @@ void UToyStatsPublisherComponent::BeginPlay()
  */
 void UToyStatsPublisherComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	UWorld* World = GetWorld();
+	const UWorld* World = GetWorld();
 	if (::IsValid(World))
 	{
-		if (UGameInstance* GameInstance = World->GetGameInstance())
+		if (const UGameInstance* GameInstance = World->GetGameInstance())
 		{
 			if (UEventBusSubsystem* EventBusSubsystem = GameInstance->GetSubsystem<UEventBusSubsystem>())
 			{
