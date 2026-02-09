@@ -19,6 +19,7 @@ UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_DeadCleanup, "EventBus.Test.Dead
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_OwningMultiFunc, "EventBus.Test.OwningMultiFunc");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_NonOwningSelective, "EventBus.Test.NonOwningSelective");
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_RemovePublisherStopsDispatch, "EventBus.Test.RemovePublisherStopsDispatch");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_EventBus_Test_ChannelRequiredBeforeBind, "EventBus.Test.ChannelRequiredBeforeBind");
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEventBusCoreRegisterUnregisterTest,
@@ -45,6 +46,44 @@ bool FEventBusCoreRegisterUnregisterTest::RunTest(const FString& NFL_EVENTBUS_MA
 	TestTrue(TEXT("Channel is registered"), Bus.IsChannelRegistered(TAG_EventBus_Test_Core));
 	TestTrue(TEXT("UnregisterChannel succeeds"), Bus.UnregisterChannel(TAG_EventBus_Test_Core));
 	TestFalse(TEXT("Channel is no longer registered"), Bus.IsChannelRegistered(TAG_EventBus_Test_Core));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEventBusChannelRequiredBeforeBindTest,
+	"EventBus.Core.ChannelRequiredBeforeBind",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEventBusChannelRequiredBeforeBindTest::RunTest(const FString& NFL_EVENTBUS_MAYBE_UNUSED Parameters)
+{
+	using namespace Nfrrlib::EventBus;
+
+	FEventBus Bus;
+	UEventBusTestPublisherObject* Publisher = NewObject<UEventBusTestPublisherObject>();
+	UEventBusTestListenerObject* Listener = NewObject<UEventBusTestListenerObject>();
+
+	FPublisherBinding PublisherBinding;
+	PublisherBinding.DelegatePropertyName = GET_MEMBER_NAME_CHECKED(UEventBusTestPublisherObject, OnValueChanged);
+
+	FListenerBinding ListenerBinding;
+	ListenerBinding.FunctionName = GET_FUNCTION_NAME_CHECKED(UEventBusTestListenerObject, OnValue);
+
+	TestFalse(TEXT("AddPublisher fails when channel is not registered"),
+		Bus.AddPublisher(TAG_EventBus_Test_ChannelRequiredBeforeBind, Publisher, PublisherBinding));
+	TestFalse(TEXT("AddListener fails when channel is not registered"),
+		Bus.AddListener(TAG_EventBus_Test_ChannelRequiredBeforeBind, Listener, ListenerBinding));
+
+	FChannelRegistration Registration;
+	Registration.ChannelTag = TAG_EventBus_Test_ChannelRequiredBeforeBind;
+	TestTrue(TEXT("RegisterChannel succeeds"), Bus.RegisterChannel(Registration));
+	TestTrue(TEXT("AddPublisher succeeds after channel registration"),
+		Bus.AddPublisher(TAG_EventBus_Test_ChannelRequiredBeforeBind, Publisher, PublisherBinding));
+	TestTrue(TEXT("AddListener succeeds after channel registration"),
+		Bus.AddListener(TAG_EventBus_Test_ChannelRequiredBeforeBind, Listener, ListenerBinding));
+
+	Publisher->EmitValue(1.0f);
+	TestEqual(TEXT("Listener receives callback after valid registration flow"), Listener->ValueCallCount, 1);
+
 	return true;
 }
 

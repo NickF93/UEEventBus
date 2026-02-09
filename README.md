@@ -36,6 +36,20 @@ EventBus is channel-driven:
 
 The plugin keeps an internal runtime history of successful bindings for BP ergonomics. No manual registry setup is required.
 
+## Toy Sample Lifecycle
+
+The Toy sample pre-registers channels from a game-instance subsystem so bindings do not depend on actor/component `BeginPlay` order.
+
+1. `UToyEventBusChannelsSubsystem::Initialize` registers toy channels once per game instance.
+2. Toy publishers only add/remove publisher bindings in `BeginPlay`/`EndPlay`.
+3. Toy listeners can safely add listener bindings in `BeginPlay`.
+
+Relevant files:
+
+- `Source/UEEventBus/ToyEventBusChannelsSubsystem.h`
+- `Source/UEEventBus/ToyEventBusChannelsSubsystem.cpp`
+- `Source/UEEventBus/ToyStatsPublisherComponent.cpp`
+
 ## Architecture
 
 ```mermaid

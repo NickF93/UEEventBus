@@ -121,7 +121,7 @@ Dependency rules:
 
 ## Blueprint Quick Start
 
-1. On publisher `BeginPlay`: call `RegisterChannel`.
+1. Early in runtime, call `RegisterChannel` once (recommended in a `UGameInstanceSubsystem::Initialize` for stable ordering).
 2. Call `AddPublisherValidated` (or `AddPublisher`) with:
    - same channel tag
    - publisher object (`self` or explicit reference)

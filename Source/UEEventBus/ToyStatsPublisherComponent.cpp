@@ -34,7 +34,7 @@ void UToyStatsPublisherComponent::SetStamina(const float InStamina)
 }
 
 /**
- * @brief Registers toy channels and publisher bindings at component startup.
+ * @brief Registers toy publisher bindings at component startup.
  */
 void UToyStatsPublisherComponent::BeginPlay()
 {
@@ -59,17 +59,13 @@ void UToyStatsPublisherComponent::BeginPlay()
 	}
 
 	Nfrrlib::EventBus::FEventBus& Bus = EventBusSubsystem->GetEventBus();
-	const bool bHealthRegistered = Nfrrlib::EventBus::TEventChannelApi<FToyHealthChangedChannel>::Register(Bus, false);
-	const bool bStaminaRegistered = Nfrrlib::EventBus::TEventChannelApi<FToyStaminaChangedChannel>::Register(Bus, false);
 	const bool bHealthPublisherAdded = Nfrrlib::EventBus::TEventChannelApi<FToyHealthChangedChannel>::AddPublisher(Bus, this);
 	const bool bStaminaPublisherAdded = Nfrrlib::EventBus::TEventChannelApi<FToyStaminaChangedChannel>::AddPublisher(Bus, this);
 
-	if (!bHealthRegistered || !bStaminaRegistered || !bHealthPublisherAdded || !bStaminaPublisherAdded)
+	if (!bHealthPublisherAdded || !bStaminaPublisherAdded)
 	{
 		UE_LOG(LogNFLEventBus, Warning,
-			TEXT("Toy publisher registration incomplete. HealthReg=%d StaminaReg=%d HealthPub=%d StaminaPub=%d"),
-			bHealthRegistered,
-			bStaminaRegistered,
+			TEXT("Toy publisher registration incomplete. HealthPub=%d StaminaPub=%d"),
 			bHealthPublisherAdded,
 			bStaminaPublisherAdded);
 	}

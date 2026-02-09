@@ -36,7 +36,7 @@ public:
 	void SetStamina(float InStamina);
 
 protected:
-	/** @brief Registers channels/publishers into EventBus at startup. */
+	/** @brief Registers publishers into EventBus at startup. */
 	virtual void BeginPlay() override;
 	/** @brief Removes publishers from EventBus at teardown. */
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

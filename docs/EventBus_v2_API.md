@@ -34,6 +34,7 @@ Bus.Reset();
 ### Runtime Rules
 
 - Channel must be registered before add/remove publisher/listener calls.
+- For game-wide channels, prefer registration during game-instance startup (for example `UGameInstanceSubsystem::Initialize`) to avoid actor `BeginPlay` ordering races.
 - Channel signature is inferred from first valid publisher delegate bound on that channel.
 - Listener/publisher bindings must remain signature-compatible.
 - Listener identity key is `FObjectKey + FName`.
