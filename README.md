@@ -34,7 +34,7 @@ EventBus is channel-driven:
 4. Unregister listener(s).
 5. Unregister publisher(s).
 
-The plugin keeps an internal runtime history of successful bindings for BP ergonomics. No manual registry setup is required.
+The plugin keeps an internal runtime history of successful bindings for BP ergonomics. No manual registry setup is required. History is bounded and auto-prunes invalid class entries.
 
 ## Toy Sample Lifecycle
 
@@ -92,7 +92,7 @@ flowchart LR
 
 ## Notes
 
-- Validated APIs perform runtime checks and do not require pre-authored rule tables.
+- All binding add APIs (`AddPublisherValidated`, `AddPublisher`, `AddListenerValidated`, `AddListener`) perform runtime checks and do not require pre-authored rule tables.
 - Channel signature is inferred by first publisher delegate bound on channel.
 - Listener identity is tracked by instance + function.
 

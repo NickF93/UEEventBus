@@ -66,6 +66,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "EventBus")
 	TArray<FName> GetKnownListenerFunctions(const FGameplayTag& ChannelTag, UClass* ListenerClass) const;
 
+	/** @brief Clears all runtime history entries. */
+	UFUNCTION(BlueprintCallable, Category = "EventBus")
+	void ResetHistory();
+
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "EventBus|History")
 	TArray<FEventBusPublisherHistoryEntry> PublisherHistory;

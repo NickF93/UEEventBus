@@ -96,7 +96,9 @@ Dependency rules:
 
 - No additional subsystem setup step is required.
 - No pre-authored rule table is required.
-- Validated nodes still perform runtime input/signature checks and return `false` on failure.
+- Runtime history auto-prunes invalid class entries and keeps a bounded number of records.
+- All binding add APIs (`AddPublisherValidated`, `AddPublisher`, `AddListenerValidated`, `AddListener`) run runtime input/signature checks and return `false` on failure.
+- `UEventBusRegistryAsset::ResetHistory()` can be called to clear all runtime history explicitly.
 
 ## Blueprint Nodes (`UEventBusBlueprintLibrary`)
 

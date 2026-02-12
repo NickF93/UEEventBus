@@ -72,7 +72,9 @@ Typed helper contract:
 - `RemoveListener`
 - `GetKnownListenerFunctions`
 
-Validated methods do runtime checks and record successful binds into runtime history.
+All binding add methods (`AddPublisherValidated`, `AddPublisher`, `AddListenerValidated`, `AddListener`) do runtime checks and record successful binds into runtime history.
+Runtime history auto-prunes invalid class entries and uses a bounded in-memory size.
+`UEventBusRegistryAsset::ResetHistory()` clears all runtime history explicitly.
 No pre-authored rule table setup is required.
 
 ## Editor Filtered Nodes

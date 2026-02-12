@@ -31,7 +31,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddPublisherValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
 
-	/** @brief Adds one publisher delegate binding to one channel. */
+	/** @brief Adds one publisher delegate binding to one channel and records successful binds in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddPublisher(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
 
@@ -43,7 +43,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddListenerValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 
-	/** @brief Adds one listener function binding to one channel. */
+	/** @brief Adds one listener function binding to one channel and records successful binds in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddListener(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 

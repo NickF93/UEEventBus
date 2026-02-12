@@ -59,7 +59,9 @@ No reverse dependencies are allowed.
 1. Subsystem creates an internal transient runtime history object at initialize.
 2. Successful BP binds are recorded as channel/class/member tuples.
 3. `GetKnownListenerFunctions` reads this dynamic history.
-4. No manual rule asset setup is required.
+4. Runtime history auto-prunes invalid class entries and remains bounded in size.
+5. `UEventBusRegistryAsset::ResetHistory()` can clear all runtime history on demand.
+6. No manual rule asset setup is required.
 
 ## Ownership Policy
 
