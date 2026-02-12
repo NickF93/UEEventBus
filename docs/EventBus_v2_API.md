@@ -1,21 +1,8 @@
 ﻿# EventBus v2 API Reference
 
-## Mandatory Constraints (1-14)
+## Engineering Constraints
 
-1. Unreal Engine 5.5+ coding rules and best practices.
-2. C++20+ best practices and standards.
-3. Prefer Unreal Engine libraries/types over STL where practical.
-4. Use well-defined GoF patterns where appropriate.
-5. Maintain strong decoupling.
-6. Keep naming and formatting coherent.
-7. Keep comments, doxygen, and textual docs up to date.
-8. Enforce clear responsibility separation between code entities.
-9. Follow OOP best practices.
-10. Maintain compatibility with C++ `>= 20` and Unreal Engine `>= 5.5` (5.6/5.7+ included).
-11. Keep code clean, safe, and well structured.
-12. Avoid workaround and non-canonical code paths.
-13. Apply DRY best practices and avoid unnecessary repetition.
-14. Avoid dead or unreachable code.
+Use the project-level constraints defined in `README.md`.
 
 ## Core Runtime API
 

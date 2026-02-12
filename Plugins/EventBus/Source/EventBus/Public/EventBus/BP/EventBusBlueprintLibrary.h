@@ -27,11 +27,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool UnregisterChannel(UObject* WorldContextObject, FGameplayTag ChannelTag);
 
-	/** @brief Adds one publisher delegate binding and records it in runtime history. */
+	/** @brief Adds a publisher binding using the validated Blueprint node variant. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddPublisherValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
 
-	/** @brief Adds one publisher delegate binding to one channel and records successful binds in runtime history. */
+	/** @brief Adds a publisher binding to a channel. Successful binds are stored in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddPublisher(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj, FName DelegatePropertyName);
 
@@ -39,11 +39,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool RemovePublisher(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* PublisherObj);
 
-	/** @brief Adds one listener function binding and records it in runtime history. */
+	/** @brief Adds a listener binding using the validated Blueprint node variant. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddListenerValidated(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 
-	/** @brief Adds one listener function binding to one channel and records successful binds in runtime history. */
+	/** @brief Adds a listener binding to a channel. Successful binds are stored in runtime history. */
 	UFUNCTION(BlueprintCallable, Category = "EventBus", meta = (WorldContext = "WorldContextObject"))
 	static bool AddListener(UObject* WorldContextObject, FGameplayTag ChannelTag, UObject* ListenerObj, FName FunctionName);
 
